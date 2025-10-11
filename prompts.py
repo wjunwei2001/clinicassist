@@ -39,19 +39,29 @@ Make sure to only ask questions one at a time, just like how human doctors would
 
 SYMPTOMS_EXTRACTION_PROMPT = """
 You are now in Phase 2: Symptoms Collection. Based on the conversation so far, extract the symptoms from the patient's utterances.
-Hard rules:
-- Do NOT guess, infer, default, or invent any values.
-- Only extract from the patient's own utterances; ignore any assistant/system content.
-- If the patient did not explicitly state a field, return it as null.
 
-Output must strictly follow these rules; violations are considered incorrect.
-Main schema keys:
-- main_symptoms: Primary symptom(s) patient is experiencing
-- symptom_onset: When symptoms started (e.g., '3 days ago', 'this morning')
-- associated_symptoms: Related or secondary symptoms
-- additional_symptom_info: Other relevant details: severity, triggers, alleviating factors, recent activities etc.
-This is what you have extracted so far: {extracted_symptoms}
-Do not re-extract information already captured.
+**Your task:**
+Extract ONLY NEW symptom information from the patient's MOST RECENT message(s).
+- Do NOT re-extract information already shown above
+- If patient is correcting something (e.g., "actually it started 5 days ago"), extract the correction
+- If patient adds new symptoms or details, extract those
+
+Hard rules:
+- Extract only NEW information not already captured
+- Do NOT guess, infer, default, or invent any values
+- Return empty lists/null if patient didn't mention new information
+- Only extract from the patient's own utterances
+
+Schema:
+- main_symptoms: NEW primary symptom(s) 
+- symptom_onset: When each symptom started (extract if NEW or CORRECTED)
+- associated_symptoms: NEW related symptoms to main symptoms
+- additional_symptom_info: NEW details about severity, triggers, etc.
+
+Extracted information so far: {extracted_symptoms}
+
+Style:
+- Write down the information as medically accurate as possible and in a way doctors would.
 """
 
 SYMPTOMS_SUFFICIENCY_CHECK_PROMPT = """
