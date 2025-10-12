@@ -1,3 +1,6 @@
+def get_current_time():
+    return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
 def show_graph(graph, xray=False):
     """Display a LangGraph mermaid diagram with fallback rendering.
     
