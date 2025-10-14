@@ -1,103 +1,264 @@
-import Image from "next/image";
+"use client";
+
+import { useState, useRef, useEffect } from "react";
+import Sidebar from "@/components/Sidebar";
+import ProgressBar from "@/components/ProgressBar";
+import { Message, ChatResponse, PatientState } from "@/types/api";
+
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
 export default function Home() {
-  return (
-    <div className="font-sans grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20">
-      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="font-mono list-inside list-decimal text-sm/6 text-center sm:text-left">
-          <li className="mb-2 tracking-[-.01em]">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] font-mono font-semibold px-1 py-0.5 rounded">
-              src/app/page.tsx
-            </code>
-            .
-          </li>
-          <li className="tracking-[-.01em]">
-            Save and see your changes instantly.
-          </li>
-        </ol>
+  const [sessionId, setSessionId] = useState<string | null>(null);
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [inputMessage, setInputMessage] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+  const [state, setState] = useState<PatientState>({});
+  const [phase, setPhase] = useState<string>("Not started");
+  const [isComplete, setIsComplete] = useState(false);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 w-full sm:w-auto md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  };
+
+  useEffect(() => {
+    scrollToBottom();
+  }, [messages]);
+
+  const startConversation = async () => {
+    setIsLoading(true);
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/chat/start`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to start conversation");
+      }
+
+      const data: ChatResponse = await response.json();
+      setSessionId(data.session_id);
+      setMessages([
+        {
+          role: "assistant",
+          content: data.assistant_message || "Hello! Let's get started.",
+        },
+      ]);
+      setState(data.state);
+      setPhase(data.phase);
+      setIsComplete(data.is_complete);
+    } catch (error) {
+      console.error("Error starting conversation:", error);
+      alert("Failed to start conversation. Make sure the backend is running.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const sendMessage = async () => {
+    if (!inputMessage.trim() || !sessionId || isLoading) return;
+
+    const userMessage: Message = {
+      role: "user",
+      content: inputMessage,
+    };
+
+    setMessages((prev) => [...prev, userMessage]);
+    setInputMessage("");
+    setIsLoading(true);
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/chat/reply`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          session_id: sessionId,
+          message: inputMessage,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to send message");
+      }
+
+      const data: ChatResponse = await response.json();
+
+      if (data.assistant_message) {
+        setMessages((prev) => [
+          ...prev,
+          {
+            role: "assistant" as const,
+            content: data.assistant_message as string,
+          },
+        ]);
+      }
+
+      setState(data.state);
+      setPhase(data.phase);
+      setIsComplete(data.is_complete);
+    } catch (error) {
+      console.error("Error sending message:", error);
+      setMessages((prev) => [
+        ...prev,
+        {
+          role: "assistant" as const,
+          content: "Sorry, there was an error processing your message.",
+        },
+      ]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleKeyPress = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      sendMessage();
+    }
+  };
+
+  const resetConversation = () => {
+    setSessionId(null);
+    setMessages([]);
+    setInputMessage("");
+    setState({});
+    setPhase("Not started");
+    setIsComplete(false);
+  };
+
+  return (
+    <div className="flex h-screen bg-white dark:bg-gray-950">
+      {/* Main Chat Area */}
+      <div className="flex-1 flex flex-col">
+        {/* Header */}
+        <div className="bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 shadow-sm">
+          <div className="px-4 py-4">
+            <div className="flex items-center justify-between max-w-4xl mx-auto mb-4">
+              <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">
+                ClinicAssist
+              </h1>
+              {sessionId && (
+                <button
+                  onClick={resetConversation}
+                  className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+                >
+                  New Session
+                </button>
+              )}
+            </div>
+            {sessionId && (
+              <div className="pb-4">
+                <ProgressBar phase={phase} isComplete={isComplete} />
+              </div>
+            )}
+          </div>
         </div>
-      </main>
-      <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
+
+        {/* Messages Area */}
+        <div className="flex-1 overflow-y-auto p-4">
+          <div className="max-w-4xl mx-auto">
+            {!sessionId ? (
+              <div className="flex flex-col items-center justify-center h-full min-h-[400px]">
+                <div className="text-center mb-8">
+                  <h2 className="text-3xl font-bold text-gray-900 dark:text-gray-100 mb-4">
+                    Welcome to ClinicAssist
+                  </h2>
+                  <p className="text-gray-600 dark:text-gray-400 mb-8 max-w-md">
+                    Your AI-powered clinical assistant for patient intake and
+                    triage. Click the button below to begin.
+                  </p>
+                  <button
+                    onClick={startConversation}
+                    disabled={isLoading}
+                    className="px-8 py-4 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg shadow-lg hover:shadow-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {isLoading ? "Starting..." : "Start Conversation"}
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-4 pb-4">
+                {messages.map((message, index) => (
+                  <div
+                    key={index}
+                    className={`flex ${
+                      message.role === "user" ? "justify-end" : "justify-start"
+                    }`}
+                  >
+                    <div
+                      className={`max-w-[80%] rounded-lg p-4 ${
+                        message.role === "user"
+                          ? "bg-blue-600 text-white"
+                          : "bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-100"
+                      }`}
+                    >
+                      <div className="text-sm whitespace-pre-wrap">
+                        {message.content}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+                {isLoading && (
+                  <div className="flex justify-start">
+                    <div className="bg-gray-100 dark:bg-gray-800 rounded-lg p-4">
+                      <div className="flex space-x-2">
+                        <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
+                        <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce delay-100"></div>
+                        <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce delay-200"></div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+                <div ref={messagesEndRef} />
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Input Area */}
+        {sessionId && !isComplete && (
+          <div className="border-t border-gray-200 dark:border-gray-800 p-4 bg-white dark:bg-gray-900">
+            <div className="max-w-4xl mx-auto flex gap-2">
+              <input
+                type="text"
+                value={inputMessage}
+                onChange={(e) => setInputMessage(e.target.value)}
+                onKeyDown={handleKeyPress}
+                placeholder="Type your message..."
+                disabled={isLoading}
+                className="flex-1 px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 disabled:opacity-50"
+              />
+              <button
+                onClick={sendMessage}
+                disabled={isLoading || !inputMessage.trim()}
+                className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Send
+              </button>
+            </div>
+          </div>
+        )}
+
+        {isComplete && (
+          <div className="border-t border-gray-200 dark:border-gray-800 p-4 bg-green-50 dark:bg-green-900/20">
+            <div className="max-w-4xl mx-auto text-center">
+              <p className="text-green-800 dark:text-green-200 font-medium">
+                ✓ Conversation complete! All information has been collected.
+              </p>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Sidebar */}
+      {sessionId && (
+        <Sidebar state={state} phase={phase} isComplete={isComplete} />
+      )}
     </div>
   );
 }
