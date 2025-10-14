@@ -66,7 +66,6 @@ def build_clinical_assistant_graph():
     clinical_assistant_builder.add_edge("human_medhist_node", "extract_medhist")
 
     # Phase 4 flow
-    clinical_assistant_builder.add_edge("extract_medhist", "triage_summary")
     clinical_assistant_builder.add_edge("triage_summary", "acknowledgement")
     clinical_assistant_builder.add_edge("acknowledgement", END)
 

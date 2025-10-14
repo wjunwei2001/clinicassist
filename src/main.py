@@ -60,30 +60,33 @@ def extract_view(state: dict) -> dict:
         "generated_summary": state.get("generated_summary"),
     }
 
-def last_ai_from_stream(stream_iter):
-    last = None
-    for message, meta in stream_iter:
-        if message.content:
-            # Filter to user-facing nodes only
-            node = meta.get("langgraph_node")
-            if node in {"ask_patient_info", "ask_symptoms", "ask_medhist", "acknowledgement"}:
-                last = message.content
-                yield last
-    return last
+# def last_ai_from_stream(stream_iter):
+#     last = None
+#     for message, meta in stream_iter:
+#         if message.content:
+#             # Filter to user-facing nodes only
+#             node = meta.get("langgraph_node")
+#             if node in {"ask_patient_info", "ask_symptoms", "ask_medhist", "acknowledgement"}:
+#                 last = message.content
+#                 yield last
+#     return last
 
 @app.post("/api/chat/start", response_model=StartResponse)
 def start_chat():
     session_id = str(uuid.uuid4())
     config = thread_config(session_id)
-    assistant_last = None
-    for msg in last_ai_from_stream(clinical_assistant_graph.stream({"messages": []}, config, stream_mode="messages")):
-        assistant_last = msg
 
+    for events in clinical_assistant_graph.stream({"messages": []}, config, stream_mode="updates"):
+        for key, value in events.items():
+            if key != '__interrupt__' and isinstance(value, dict) and 'messages' in value:
+                messages = value['messages']
+                break
+    
     snapshot = clinical_assistant_graph.get_state(config)
-
+    
     return StartResponse(
         session_id=session_id, 
-        assistant_message=assistant_last, 
+        assistant_message=messages[-1].content, 
         state=extract_view(snapshot.values), 
         phase=phase_from_next(snapshot), 
         is_complete=not snapshot.next
@@ -93,17 +96,49 @@ def start_chat():
 def chat_reply(request: ChatRequest):
     config = thread_config(request.session_id)
 
-    assistant_last = None
-    for msg in last_ai_from_stream(
-        clinical_assistant_graph.stream(Command(resume=request.message), config, stream_mode="messages")
-    ):
-        assistant_last = msg
+    messages = None
+    for events in clinical_assistant_graph.stream(Command(resume=request.message), config, stream_mode="updates"):
+        for key, value in events.items():
+            if key != '__interrupt__' and isinstance(value, dict) and 'messages' in value:
+                messages = value['messages'] 
+                break
 
     snapshot = clinical_assistant_graph.get_state(config)
-    
+    is_complete = not snapshot.next
+
+    if is_complete:
+        final_state = extract_view(snapshot.values)
+        clinical_assistant_graph.checkpointer.delete_thread(request.session_id)
+        
+        closing = (
+            f"Thank you for using ClinicAssist. Your information has been captured and will be sent to the doctor. "
+            f"Your queue number is XX."
+        )
+        return ChatResponse(
+            session_id=request.session_id,
+            assistant_message=closing,
+            state=final_state,
+            phase="Complete",
+            is_complete=True,
+        )
+
+    return ChatResponse(
+        session_id=request.session_id,
+        assistant_message=messages[-1].content if messages else None,
+        state=extract_view(snapshot.values),
+        phase=phase_from_next(snapshot),
+        is_complete=False,
+    )
+
+# Manual end checkpoint
+@app.post("/api/chat/end", response_model=ChatResponse)
+def end_chat(request: ChatRequest):
+    config = thread_config(request.session_id)
+    clinical_assistant_graph.get_state(config)
+    snapshot = clinical_assistant_graph.get_state(config)
     return ChatResponse(
         session_id=request.session_id, 
-        assistant_message=assistant_last, 
+        assistant_message=None,
         state=extract_view(snapshot.values), 
         phase=phase_from_next(snapshot), 
         is_complete=not snapshot.next

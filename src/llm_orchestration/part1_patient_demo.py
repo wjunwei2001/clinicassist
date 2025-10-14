@@ -42,14 +42,15 @@ def ask_patient_info(state: AgentState) -> AgentState:
 
 def extract_patient_info(state: AgentState) -> AgentState:
     print("Extracting patient info")
-    human_only = [m for m in state.get("messages", []) if isinstance(m, HumanMessage)]
+    messages = state.get("messages", [])
+    # human_only = [m for m in state.get("messages", []) if isinstance(m, HumanMessage)]
     msgs = [
         SystemMessage(content=BASE_PROMPT),
         SystemMessage(content=(
             PATIENT_INFO_EXTRACTION_PROMPT +
             "\nOnly extract info stated by the patient. If not present, leave that field null. Use the right capitalization for names (eg. Jon Ang instead of jon ang)."
         )),
-        *human_only,
+        *messages,
     ]
     parsed: PatientInfoPartial = extract_llm.invoke(msgs)
 

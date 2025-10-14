@@ -79,7 +79,7 @@ def ask_medhist(state: AgentState) -> AgentState:
     return {"messages": [resp]}
 
 def route_after_med_history(state):
-    facts = state.get("medical_history_facts", [])
+    facts = state.get("medical_history", [])
     
     # Check mandatory items
     # has_past_condition_info = any(f.category == "past_condition" for f in facts)
@@ -94,7 +94,7 @@ def route_after_med_history(state):
 
 def check_medhist_sufficiency(state):
     print("Checking medical history sufficiency")
-    facts = state.get("medical_history_facts", [])
+    facts = state.get("medical_history", [])
     
     msgs = [
         SystemMessage(content=BASE_PROMPT),
@@ -105,6 +105,7 @@ def check_medhist_sufficiency(state):
     ]
 
     resp = medhist_sufficiency_llm.invoke(msgs)
+    print(resp)
     return resp
 
 def human_medhist_node(state: AgentState) -> AgentState:
