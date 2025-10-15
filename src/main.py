@@ -1,8 +1,6 @@
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from langgraph.checkpoint.memory import InMemorySaver
 from langgraph.types import Command
-from langchain_core.messages import HumanMessage, AIMessage
 import uuid
 import uvicorn
 
@@ -130,19 +128,19 @@ def chat_reply(request: ChatRequest):
         is_complete=False,
     )
 
-# Manual end checkpoint
-@app.post("/api/chat/end", response_model=ChatResponse)
-def end_chat(request: ChatRequest):
-    config = thread_config(request.session_id)
-    clinical_assistant_graph.get_state(config)
-    snapshot = clinical_assistant_graph.get_state(config)
-    return ChatResponse(
-        session_id=request.session_id, 
-        assistant_message=None,
-        state=extract_view(snapshot.values), 
-        phase=phase_from_next(snapshot), 
-        is_complete=not snapshot.next
-    )
+# # Manual end checkpoint
+# @app.post("/api/chat/end", response_model=ChatResponse)
+# def end_chat(request: ChatRequest):
+#     config = thread_config(request.session_id)
+#     clinical_assistant_graph.get_state(config)
+#     snapshot = clinical_assistant_graph.get_state(config)
+#     return ChatResponse(
+#         session_id=request.session_id, 
+#         assistant_message=None,
+#         state=extract_view(snapshot.values), 
+#         phase=phase_from_next(snapshot), 
+#         is_complete=not snapshot.next
+#     )
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8000)

@@ -1,15 +1,14 @@
 from models import AgentState, MedHistoryFact, MedHistorySufficiencyCheck
 from prompts import BASE_PROMPT, MEDICAL_HISTORY_EXTRACTION_PROMPT, MEDICAL_HISTORY_ASKING_PROMPT, MEDICAL_HISTORY_SUFFICIENCY_CHECK_PROMPT
 from langchain_core.messages import SystemMessage, HumanMessage
-from langchain.chat_models import init_chat_model
 from typing import List
 from utils import get_current_time
 from langgraph.types import interrupt
+from llm_orchestration.llm import llm
 
 from dotenv import load_dotenv
 load_dotenv()
 
-llm = init_chat_model(model="gpt-4.1", temperature=0)
 medhist_llm = llm.with_structured_output(MedHistoryFact)
 medhist_sufficiency_llm = llm.with_structured_output(MedHistorySufficiencyCheck)
 

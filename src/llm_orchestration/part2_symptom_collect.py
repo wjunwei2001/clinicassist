@@ -1,14 +1,13 @@
 from models import AgentState, SymptomsPartial, SymptomSufficiencyCheck
 from prompts import BASE_PROMPT, SYMPTOMS_ASKING_PROMPT, SYMPTOMS_EXTRACTION_PROMPT, SYMPTOMS_SUFFICIENCY_CHECK_PROMPT
 from langchain_core.messages import SystemMessage, HumanMessage
-from langchain.chat_models import init_chat_model
 from langgraph.types import interrupt
 from utils import get_current_time
+from llm_orchestration.llm import llm
 
 from dotenv import load_dotenv
 load_dotenv()
 
-llm = init_chat_model(model="gpt-4.1", temperature=0)
 symptoms_llm = llm.with_structured_output(SymptomsPartial)
 symptom_sufficiency_llm = llm.with_structured_output(SymptomSufficiencyCheck)
 

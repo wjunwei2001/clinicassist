@@ -2,12 +2,12 @@ from models import AgentState, PatientInfoPartial
 from prompts import BASE_PROMPT, PATIENT_INFO_ASKING_PROMPT, PATIENT_INFO_EXTRACTION_PROMPT
 from langchain_core.messages import SystemMessage, HumanMessage
 from langgraph.types import interrupt
-from langchain.chat_models import init_chat_model
+from llm_orchestration.llm import llm
+from utils import get_current_time
 
 from dotenv import load_dotenv
 load_dotenv()
 
-llm = init_chat_model(model="gpt-4.1", temperature=0)
 extract_llm = llm.with_structured_output(PatientInfoPartial)
 
 def ask_patient_info(state: AgentState) -> AgentState: 
@@ -32,7 +32,7 @@ def ask_patient_info(state: AgentState) -> AgentState:
 
     msgs = [
         SystemMessage(content=BASE_PROMPT),
-        SystemMessage(content=PATIENT_INFO_ASKING_PROMPT),
+        SystemMessage(content=PATIENT_INFO_ASKING_PROMPT.format(current_time=get_current_time())),
         SystemMessage(content=steering),
         *state["messages"],
     ]
@@ -47,7 +47,7 @@ def extract_patient_info(state: AgentState) -> AgentState:
     msgs = [
         SystemMessage(content=BASE_PROMPT),
         SystemMessage(content=(
-            PATIENT_INFO_EXTRACTION_PROMPT +
+            PATIENT_INFO_EXTRACTION_PROMPT.format(current_time=get_current_time()) +
             "\nOnly extract info stated by the patient. If not present, leave that field null. Use the right capitalization for names (eg. Jon Ang instead of jon ang)."
         )),
         *messages,
