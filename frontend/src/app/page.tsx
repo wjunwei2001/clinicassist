@@ -16,6 +16,7 @@ export default function Home() {
   const [phase, setPhase] = useState<string>("Not started");
   const [isComplete, setIsComplete] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -24,6 +25,12 @@ export default function Home() {
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
+
+  useEffect(() => {
+    if (sessionId && !isComplete) {
+      inputRef.current?.focus();
+    }
+  }, [sessionId, isComplete]);
 
   const startConversation = async () => {
     setIsLoading(true);
@@ -69,6 +76,7 @@ export default function Home() {
     setMessages((prev) => [...prev, userMessage]);
     setInputMessage("");
     setIsLoading(true);
+    inputRef.current?.focus();
 
     try {
       const response = await fetch(`${API_BASE_URL}/api/chat/reply`, {
@@ -112,6 +120,7 @@ export default function Home() {
       ]);
     } finally {
       setIsLoading(false);
+      inputRef.current?.focus();
     }
   };
 
@@ -230,11 +239,13 @@ export default function Home() {
                 onChange={(e) => setInputMessage(e.target.value)}
                 onKeyDown={handleKeyPress}
                 placeholder="Type your message..."
-                disabled={isLoading}
+                ref={inputRef}
+                enterKeyHint="send"
                 className="flex-1 px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 disabled:opacity-50"
               />
               <button
                 onClick={sendMessage}
+                onMouseDown={(e) => e.preventDefault()}
                 disabled={isLoading || !inputMessage.trim()}
                 className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >

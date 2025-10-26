@@ -33,7 +33,7 @@ export default function ProgressBar({ phase, isComplete }: ProgressBarProps) {
             {/* Stage Circle */}
             <div className="flex flex-col items-center">
               <div
-                className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-all ${
+                className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold transition-all ${
                   stage.id < currentStage
                     ? "bg-emerald-500 text-white"
                     : stage.id === currentStage
@@ -44,7 +44,7 @@ export default function ProgressBar({ phase, isComplete }: ProgressBarProps) {
                 {stage.id < currentStage ? "✓" : stage.id}
               </div>
               <div
-                className={`mt-1.5 text-xs font-medium whitespace-nowrap ${
+                className={`mt-1.5 text-sm font-semibold whitespace-nowrap ${
                   stage.id <= currentStage
                     ? "text-slate-900 dark:text-slate-100"
                     : "text-gray-400 dark:text-gray-500"
