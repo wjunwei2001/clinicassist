@@ -1,13 +1,30 @@
+import os
+from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from langgraph.types import Command
+from contextlib import asynccontextmanager
 import uuid
 import uvicorn
 
 from llm_orchestration.clinical_assistant_graph import build_clinical_assistant_graph, thread_config
 from models import StartResponse, ChatRequest, ChatResponse
+from langgraph.checkpoint.postgres import PostgresSaver
 
-app = FastAPI()
+load_dotenv()
+
+clinical_assistant_graph = None
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    global clinical_assistant_graph
+    db_url = os.environ["DATABASE_URL"]
+    with PostgresSaver.from_conn_string(db_url) as saver:
+        saver.setup()  # creates tables if needed
+        clinical_assistant_graph = build_clinical_assistant_graph(checkpointer=saver)
+        yield
+
+app = FastAPI(lifespan=lifespan)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -15,8 +32,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-clinical_assistant_graph = build_clinical_assistant_graph()
 
 PHASE_BY_NODE = {
     # Phase 1
@@ -106,7 +121,7 @@ def chat_reply(request: ChatRequest):
 
     if is_complete:
         final_state = extract_view(snapshot.values)
-        clinical_assistant_graph.checkpointer.delete_thread(request.session_id)
+        # clinical_assistant_graph.checkpointer.delete_thread(request.session_id)
         
         closing = (
             f"Thank you for using ClinicAssist. Your information has been captured and will be sent to the doctor. "

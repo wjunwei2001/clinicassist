@@ -1,16 +1,13 @@
-from langgraph.graph import StateGraph, START, END, MessagesState
-from langgraph.types import interrupt, Command
+from langgraph.graph import StateGraph, START, END
 from langgraph.checkpoint.memory import InMemorySaver
-from typing import Literal, Optional, List
-from pydantic import BaseModel, Field
 
-from models import AgentState, PatientInfoPartial, SymptomsPartial, SymptomSufficiencyCheck, MedHistoryFact, MedHistorySufficiencyCheck, TriageSummary
+from models import AgentState
 from llm_orchestration.part1_patient_demo import ask_patient_info, extract_patient_info, human_patient_info_node, route_after_patient_info
-from llm_orchestration.part2_symptom_collect import ask_symptoms, extract_symptoms, check_symptom_sufficiency, human_symptoms_node, route_after_symptoms
-from llm_orchestration.part3_medhist_collect import ask_medhist, extract_medhist, check_medhist_sufficiency, route_after_med_history, human_medhist_node
+from llm_orchestration.part2_symptom_collect import ask_symptoms, extract_symptoms, human_symptoms_node, route_after_symptoms
+from llm_orchestration.part3_medhist_collect import ask_medhist, extract_medhist, route_after_med_history, human_medhist_node
 from llm_orchestration.part4_triaging import triage_summary, acknowledgement
 
-def build_clinical_assistant_graph():
+def build_clinical_assistant_graph(checkpointer):
     clinical_assistant_builder = StateGraph(AgentState)
 
     # Add Phase 1 nodes
@@ -79,7 +76,7 @@ def build_clinical_assistant_graph():
         }
     )
 
-    checkpointer = InMemorySaver()
+    # checkpointer = InMemorySaver()
 
     return clinical_assistant_builder.compile(
         checkpointer=checkpointer,
